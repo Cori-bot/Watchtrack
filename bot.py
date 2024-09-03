@@ -334,7 +334,7 @@ async def explanations(interaction: nextcord.Interaction):
         inline=False
     )
     embed.add_field(
-        name="/explanationss",
+        name="/explanations",
         value="Affiche ce message d'explication avec toutes les commandes et leurs descriptions.",
         inline=False
     )
