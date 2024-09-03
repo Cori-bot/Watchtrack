@@ -1,4 +1,5 @@
 # Watchtrack
+![Photo de Profile](watchtrack/WatchTrack.png "Watchtrack")
 
 Il s'agit d'un bot Discord permettant de gérer une liste de films, de séries, de mangas et d'animes. Vous pouvez ajouter, modifier et filtrer les médias en utilisant diverses commandes.
 
