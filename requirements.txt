@@ -1,0 +1,2 @@
+nextcord
+setuptools
