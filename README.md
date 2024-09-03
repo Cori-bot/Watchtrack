@@ -2,6 +2,10 @@
 
 Il s'agit d'un bot Discord permettant de gérer une liste de films, de séries, de mangas et d'animes. Vous pouvez ajouter, modifier et filtrer les médias en utilisant diverses commandes.
 
+## Discord
+
+***Pour tester le bot avant de le telecharger, vous pouvez rejoindre le serveur discord de test → [ici](https://discord.gg/E3X3WBZE2w)***
+
 ## Fonctionnalités
 
 - Ajouter des médias à votre liste
