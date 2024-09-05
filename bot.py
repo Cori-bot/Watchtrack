@@ -481,6 +481,11 @@ async def explanations(interaction: nextcord.Interaction):
         inline=False
     )
     embed.add_field(
+        name="/export",
+        value="Exporte votre liste de films, séries, mangas et animes dans un fichier texte que vous pouvez télécharger.",
+        inline=False
+    )
+    embed.add_field(
         name="/explanations",
         value="Affiche ce message d'explication avec toutes les commandes et leurs descriptions.",
         inline=False
