@@ -194,7 +194,7 @@ async def edit(
 @bot.slash_command(description="Voir la liste complète de vos films, séries, mangas et animes")
 async def list(
     interaction: nextcord.Interaction,
-    order: str = SlashOption(name="ordre",choices={"A ➜ Z": "asc", "Z ➜ A": "desc"},description="Ordre d'affichage des médias")
+    order: str = SlashOption(name="ordre", choices={"A ➜ Z": "asc", "Z ➜ A": "desc"}, description="Ordre d'affichage des médias")
 ):
     user_id = interaction.user.id
     user_data = load_user_data(user_id)
@@ -225,6 +225,20 @@ async def list(
     # Déterminer l'ordre de tri
     reverse_order = order == "desc"
 
+    # Fonction pour ajouter des champs sans dépasser la limite de 1024 caractères
+    def add_embed_field(embed, category, statut, filtered_medias):
+        # Séparer les médias si nécessaire
+        chunk = ""
+        for media in filtered_medias:
+            media_text = f"- {media['nom']}{format_media_details(media)}\n"
+            if len(chunk) + len(media_text) > 1024:  # Si ça dépasse la limite
+                embed.add_field(name=f"{category.capitalize()} ({statut.capitalize()})", value=chunk, inline=False)
+                chunk = media_text  # Commence un nouveau bloc
+            else:
+                chunk += media_text
+        if chunk:  # Ajouter le dernier bloc restant
+            embed.add_field(name=f"{category.capitalize()} ({statut.capitalize()})", value=chunk, inline=False)
+
     # Itérer à travers chaque type de média
     for category in ['films', 'séries', 'animes', 'mangas']:
         medias = user_data[category]
@@ -237,11 +251,7 @@ async def list(
                 filtered_medias.sort(key=lambda media: media['nom'], reverse=reverse_order)
 
                 if filtered_medias:
-                    field_value = "\n".join(
-                        f"- {media['nom']}{format_media_details(media)}"
-                        for media in filtered_medias
-                    )
-                    embed.add_field(name=f"{category.capitalize()} ({statut.capitalize()})", value=field_value, inline=False)
+                    add_embed_field(embed, category, statut, filtered_medias)
 
     await interaction.response.send_message(embed=embed)
 
@@ -320,12 +330,12 @@ async def filter(
 @bot.slash_command(description="Rechercher un film, une série, un manga ou un anime dans votre liste")
 async def search(
     interaction: nextcord.Interaction,
-    query: str = SlashOption(name="query", description="Nom ou partie du nom du média à rechercher")
+    recherche: str = SlashOption(name="recherche", description="Nom ou partie du nom du média à rechercher")
 ):
     user_id = interaction.user.id
     user_data = load_user_data(user_id)
 
-    normalized_query = normalize_name(query)
+    normalized_recherche = normalize_name(recherche)
     results = {
         'films': [],
         'séries': [],
@@ -337,16 +347,16 @@ async def search(
     for media_type in results.keys():
         results[media_type] = [
             media for media in user_data[media_type]
-            if normalized_query in normalize_name(media['nom'])
+            if normalized_recherche in normalize_name(media['nom'])
         ]
 
     # Si aucun média n'est trouvé
     if all(len(result) == 0 for result in results.values()):
-        await interaction.response.send_message(f"Aucun média trouvé correspondant à '{query}'.", ephemeral=True)
+        await interaction.response.send_message(f"Aucun média trouvé correspondant à '{recherche}'.", ephemeral=True)
         return
 
     embed = nextcord.Embed(
-        title=f"Résultats de la recherche pour : {query}",
+        title=f"Résultats de la recherche pour : {recherche}",
         color=nextcord.Color.purple()
     )
 
@@ -375,6 +385,68 @@ async def search(
             )
 
     await interaction.response.send_message(embed=embed)
+
+@bot.slash_command(description="Exporter votre liste de films, séries, mangas et animes, triée par catégorie et statut")
+async def export(interaction: nextcord.Interaction):
+    user_id = interaction.user.id
+    user_data = load_user_data(user_id)
+
+    if not any(user_data.values()):  # Vérifie si la liste est vide
+        await interaction.response.send_message("Votre liste est vide.", ephemeral=True)
+        return
+
+    # Générer le contenu du fichier
+    file_content = "Votre liste de médias (triée par catégorie et statut) :\n\n"
+
+    # Définir l'ordre des statuts pour le tri
+    statut_order = {
+        "en cours": 1,
+        "terminé": 2,
+        "prévu": 3,
+    }
+
+    # Fonction pour formater les détails des médias
+    def format_media_details(media):
+        details = []
+        if media.get('saison') is not None:
+            details.append(f"Saison : {media['saison']}")
+        if media.get('episode') is not None:
+            details.append(f"Épisode : {media['episode']}")
+        if media.get('volume') is not None:
+            details.append(f"Volume : {media['volume']}")
+        if media.get('chapitre') is not None:
+            details.append(f"Chapitre : {media['chapitre']}")
+        return " - " + ", ".join(details) if details else ""
+
+    # Fonction pour trier et afficher une catégorie
+    def format_category(category_name, medias):
+        category_content = f"{category_name.capitalize()} :\n"
+        # Trier les médias par statut en utilisant l'ordre défini
+        medias_sorted = sorted(medias, key=lambda media: statut_order.get(media['statut'], 99))
+        for media in medias_sorted:
+            details = format_media_details(media)
+            category_content += f"- {media['nom']} (Statut : {media['statut']}){details}\n"
+        return category_content + "\n"
+
+    # Traiter chaque catégorie (films, séries, animes, mangas)
+    for category in ['films', 'séries', 'animes', 'mangas']:
+        medias = user_data.get(category, [])
+        if medias:
+            file_content += format_category(category, medias)
+
+    # Sauvegarder le fichier dans le répertoire temporaire avec l'encodage UTF-8
+    file_name = f"{user_id}_media_list.txt"
+    file_path = os.path.join(DATA_DIR, file_name)
+
+    with open(file_path, "w", encoding="utf-8") as file:  # Utilisation de l'encodage UTF-8
+        file.write(file_content)
+
+    # Envoyer le fichier à l'utilisateur
+    file = nextcord.File(file_path, filename=file_name)
+    await interaction.response.send_message("Voici votre liste de médias triée :", file=file)
+
+    # Supprimer le fichier après l'envoi pour éviter d'encombrer le répertoire
+    os.remove(file_path)
 
 @bot.slash_command(description="Demander des explications en cas de doute ou de difficulté")
 async def explanations(interaction: nextcord.Interaction):
