@@ -116,14 +116,14 @@ async def add(
 @bot.slash_command(description="Modifier ou supprimer les informations sur un film, une série, un manga ou un anime")
 async def edit(
     interaction: nextcord.Interaction,
-    type: str = SlashOption(name="type",choices={"film": "film", "série": "série", "manga": "manga", "anime": "anime"},description="Le type de média"),
-    nom: str = SlashOption(name="nom",description="Le nom du film, de la série, du manga ou de l'anime"),
-    action: str = SlashOption(name="action",choices={"éditer": "edit", "supprimer": "delete"},description="Action à effectuer"),
-    statut: str = SlashOption(name="statut",choices={"terminé": "finished", "en cours": "in progress", "prévu": "planned"},description="Statut de visionnage",required=False),
-    saison: int = SlashOption(name="saison",required=False,description="Numéro de la saison (si en cours)"),
-    episode: int = SlashOption(name="épisode",required=False,description="Numéro de l'épisode (si en cours)"),
-    volume: int = SlashOption(name="volume",required=False,description="Numéro du volume (si en cours)"),
-    chapitre: int = SlashOption(name="chapitre",required=False,description="Numéro du chapitre (si en cours)")
+    type: str = SlashOption(name="type", choices={"film": "film", "série": "série", "manga": "manga", "anime": "anime"}, description="Le type de média"),
+    nom: str = SlashOption(name="nom", description="Le nom du film, de la série, du manga ou de l'anime"),
+    action: str = SlashOption(name="action", choices={"éditer": "éditer", "supprimer": "supprimer"}, description="Action à effectuer"),
+    statut: str = SlashOption(name="statut", choices={"terminé": "terminé", "en cours": "en cours", "prévu": "prévu"}, description="Statut de visionnage"),
+    saison: int = SlashOption(name="saison", required=False, description="Numéro de la saison (si en cours)"),
+    episode: int = SlashOption(name="épisode", required=False, description="Numéro de l'épisode (si en cours)"),
+    volume: int = SlashOption(name="volume", required=False, description="Numéro du volume (si en cours)"),
+    chapitre: int = SlashOption(name="chapitre", required=False, description="Numéro du chapitre (si en cours)")
 ):
     user_id = interaction.user.id
     user_data = load_user_data(user_id)
@@ -132,7 +132,7 @@ async def edit(
     capitalized_nom = capitalize_name(nom)
 
     media_list = user_data[type + 's']
-    media_entry = next((media for media in media_list if normalize_name(media['name']) == normalized_nom), None)
+    media_entry = next((media for media in media_list if normalize_name(media.get('nom')) == normalized_nom), None)
 
     if action == 'supprimer':
         if media_entry:
@@ -147,13 +147,21 @@ async def edit(
         await interaction.response.send_message("Ce média n'est pas dans votre liste.", ephemeral=True)
         return
 
-    media_entry['statut'] = statut
+    # Mise à jour uniquement si la valeur est fournie (non None)
+    if statut is not None:
+        media_entry['statut'] = statut
+
     if statut == 'en cours':
-        media_entry['saison'] = saison
-        media_entry['episode'] = episode
-        media_entry['volume'] = volume
-        media_entry['chapitre'] = chapitre
+        if saison is not None:
+            media_entry['saison'] = saison
+        if episode is not None:
+            media_entry['episode'] = episode
+        if volume is not None:
+            media_entry['volume'] = volume
+        if chapitre is not None:
+            media_entry['chapitre'] = chapitre
     else:
+        # Si le statut n'est pas "en cours", on enlève ces informations
         media_entry.pop('saison', None)
         media_entry.pop('episode', None)
         media_entry.pop('volume', None)
@@ -163,21 +171,24 @@ async def edit(
 
     embed = nextcord.Embed(
         title=f"Modifié : {capitalized_nom}",
-        description=f"Type : {type}\nStatut : {statut}",
+        description=f"Type : {type}",
         color=get_color(type)
     )
 
-    if statut == 'en cours':
-        if 'saison' in media_entry:
-            embed.add_field(name="Saison", value=media_entry['saison'], inline=False)
-        if 'episode' in media_entry:
-            embed.add_field(name="Épisode", value=media_entry['episode'], inline=False)
-        if 'volume' in media_entry:
-            embed.add_field(name="Volume", value=media_entry['volume'], inline=False)
-        if 'chapitre' in media_entry:
-            embed.add_field(name="Chapitre", value=media_entry['chapitre'], inline=False)
+    # Afficher les champs mis à jour
+    if 'statut' in media_entry and media_entry['statut'] is not None:
+        embed.add_field(name="Statut", value=media_entry['statut'], inline=False)
+    if 'saison' in media_entry and media_entry['saison'] is not None:
+        embed.add_field(name="Saison", value=media_entry['saison'], inline=False)
+    if 'episode' in media_entry and media_entry['episode'] is not None:
+        embed.add_field(name="Épisode", value=media_entry['episode'], inline=False)
+    if 'volume' in media_entry and media_entry['volume'] is not None:
+        embed.add_field(name="Volume", value=media_entry['volume'], inline=False)
+    if 'chapitre' in media_entry and media_entry['chapitre'] is not None:
+        embed.add_field(name="Chapitre", value=media_entry['chapitre'], inline=False)
 
     await interaction.response.send_message(embed=embed)
+
 
 
 @bot.slash_command(description="Voir la liste complète de vos films, séries, mangas et animes")
@@ -306,6 +317,65 @@ async def filter(
 
     await interaction.response.send_message(embed=embed)
 
+@bot.slash_command(description="Rechercher un film, une série, un manga ou un anime dans votre liste")
+async def search(
+    interaction: nextcord.Interaction,
+    query: str = SlashOption(name="query", description="Nom ou partie du nom du média à rechercher")
+):
+    user_id = interaction.user.id
+    user_data = load_user_data(user_id)
+
+    normalized_query = normalize_name(query)
+    results = {
+        'films': [],
+        'séries': [],
+        'mangas': [],
+        'animes': []
+    }
+
+    # Recherche dans chaque catégorie
+    for media_type in results.keys():
+        results[media_type] = [
+            media for media in user_data[media_type]
+            if normalized_query in normalize_name(media['nom'])
+        ]
+
+    # Si aucun média n'est trouvé
+    if all(len(result) == 0 for result in results.values()):
+        await interaction.response.send_message(f"Aucun média trouvé correspondant à '{query}'.", ephemeral=True)
+        return
+
+    embed = nextcord.Embed(
+        title=f"Résultats de la recherche pour : {query}",
+        color=nextcord.Color.purple()
+    )
+
+    # Fonction pour formater les détails du média
+    def format_media_details(media):
+        details = []
+        if media.get('saison') is not None:
+            details.append(f"Saison : {media['saison']}")
+        if media.get('episode') is not None:
+            details.append(f"Épisode : {media['episode']}")
+        if media.get('volume') is not None:
+            details.append(f"Volume : {media['volume']}")
+        if media.get('chapitre') is not None:
+            details.append(f"Chapitre : {media['chapitre']}")
+        return " - " + ", ".join(details) if details else ""
+
+    # Ajoute les résultats à l'embed
+    for media_type, media_list in results.items():
+        if media_list:
+            embed.add_field(
+                name=media_type.capitalize(),
+                value="\n".join(
+                    f"- {media['nom']}{format_media_details(media)}" for media in media_list
+                ),
+                inline=False
+            )
+
+    await interaction.response.send_message(embed=embed)
+
 @bot.slash_command(description="Demander des explications en cas de doute ou de difficulté")
 async def explanations(interaction: nextcord.Interaction):
     embed = nextcord.Embed(
@@ -334,10 +404,17 @@ async def explanations(interaction: nextcord.Interaction):
         inline=False
     )
     embed.add_field(
+        name="/search",
+        value="Permet de rechercher un film, une série, un manga ou un anime dans votre liste en fonction du nom ou d'une partie du nom. Retourne tous les résultats correspondants.",
+        inline=False
+    )
+    embed.add_field(
         name="/explanations",
         value="Affiche ce message d'explication avec toutes les commandes et leurs descriptions.",
         inline=False
     )
+    
     await interaction.response.send_message(embed=embed)
+
 
 bot.run(TOKEN)  # Remplacez par le token de votre bot
