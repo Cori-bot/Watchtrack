@@ -85,7 +85,7 @@ python -m venv venv
 
 3. Activez l'environnement virtuel :
 ```bash
-.\N-venv\Scripts\Nactivate
+call venv/scripts/activate.bat
 ```
 
 #### Linux
