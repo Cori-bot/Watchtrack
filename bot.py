@@ -293,7 +293,7 @@ async def filter(
 
             if medias:
                 field_value = "\n".join(
-                    f"- {media['nom']} - {format_media_details(media)}"
+                    f"- {media['nom']} {format_media_details(media)}"
                     for media in medias
                 )
                 embed.add_field(name=current_statut.capitalize(), value=field_value, inline=False)
