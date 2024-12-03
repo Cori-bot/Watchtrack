@@ -105,11 +105,9 @@ Voici les commandes que vous pouvez utiliser avec le robot :
 ### 4. Installer les dépendances
 
 #### Une fois l'environnement virtuel activé, installez les paquets nécessaires :
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
+   ```bash
+   pip install -r requirements.txt
+   ```
 ### 5. Configurer le Bot
 
 1. Créez un fichier nommé .env dans le répertoire racine du projet.
@@ -117,11 +115,11 @@ Voici les commandes que vous pouvez utiliser avec le robot :
     ```env
     TOKEN=votre-token-discord-bot
     ```
-Remplacez **```votre-token-discord-bot```** par votre jeton de bot actuel depuis le portail des développeurs de Discord.
+Remplacez **`votre-token-discord-bot`** par votre jeton de bot actuel depuis le portail des développeurs de Discord.
 
 ## Exécuter le bot
 
 #### Avec l'environnement virtuel activé et les dépendances installées, vous pouvez lancer le bot en utilisant :
-    ```bash
-    python bot.py
-    ```
+   ```bash
+   python bot.py
+   ```
